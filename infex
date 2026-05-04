@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEDIC DR — Banco de Preguntas</title>
+
+<!-- Google Identity Services -->
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- FingerprintJS (libre) -->
+
+<script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+
+<style>
+/* ===== VARIABLES Y RESET ===== */
+:root {
+  --primary: #1a3a6b;
+  --primary-light: #0d5c8f;
+  --accent: #e8b93f;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --bg: #f0f4f8;
+  --bg-card: #ffffff;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+body.dark {
+  --bg: #0f172a;
+  --bg-card: #1e293b;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+/* Fix chip (option-btn) en dark mode */
+body.dark .option-btn {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+body.dark .option-btn:hover {
+  border-color: #60a5fa;
+  background: rgba(96,165,250,0.1);
+}
+body.dark .option-btn.selected {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+body.dark .mode-card {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+body.dark .mode-card.selected {
+  border-color: #60a5fa;
+  background: rgba(96,165,250,0.12);
+}
+/* Botón toggle */
+.btn-theme {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-theme:hover { background: rgba(255,255,255,0.15); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.3s; }
+.hidden { display: none !important; }
+button { cursor: pointer; font-family: inherit; }
+input, select { font-family: inherit; }
+
+/* ===== LOADER ===== */
+#loader {
+  position: fixed; inset: 0; background: var(--primary);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 9999; gap: 16px;
+}
+#loader .logo { font-size: 48px; }
+#loader h1 { color: white; font-size: 24px; letter-spacing: 1px; }
+#loader p { color: rgba(255,255,255,0.7); font-size: 14px; }
+.spinner {
+  width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== LAYOUT ===== */
+.screen { min-height: 100vh; display: flex; flex-direction: column; }
+.container { max-width: 700px; margin: 0 auto; padding: 24px 16px; width: 100%; }
+
+/* ===== HEADER ===== */
+.app-header {
+  background: var(--primary); color: white; padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.app-header .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.app-header .brand span { font-size: 22px; }
+.app-header .user-info { display: flex; align-items: center; gap: 10px; }
+.app-header .avatar { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; overflow: hidden; }
+.app-header .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 12px; border-radius: 8px; font-size: 13px; transition: background 0.2s; }
+.btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+/* ===== CARDS ===== */
+.card { background: var(--bg-card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+
+/* ===== LOGIN ===== */
+#screen-login {
+  background: linear-gradient(135deg, #1a3a6b 0%, #0a2444 100%);
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+}
+.login-card { text-align: center; max-width: 420px; width: 90%; background: var(--bg-card); border-radius: 20px; padding: 48px 36px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.login-logo { font-size: 56px; margin-bottom: 8px; }
+.login-title { font-size: 26px; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+.login-subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; line-height: 1.5; }
+.login-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+.login-note { font-size: 12px; color: var(--text-muted); margin-top: 20px; line-height: 1.6; }
+.error-msg { background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 16px; display: none; }
+
+/* ===== INICIO / SELECCIÓN ===== */
+.welcome-banner {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: var(--radius); padding: 24px; color: white; margin-bottom: 24px;
+}
+.welcome-banner h2 { font-size: 20px; margin-bottom: 4px; }
+.welcome-banner p { opacity: 0.85; font-size: 14px; }
+.badge-univ { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-top: 8px; }
+
+.section-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+.option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.option-btn {
+  border: 2px solid var(--border); background: var(--bg-card); color: var(--text);
+  padding: 12px 8px; border-radius: 10px; font-size: 13px; font-weight: 500;
+  text-align: center; transition: all 0.2s;
+}
+.option-btn:hover { border-color: var(--primary); background: rgba(26,58,107,0.05); }
+.option-btn.selected { border-color: var(--primary); background: var(--primary); color: white; }
+.option-btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.mode-card {
+  border: 2px solid var(--border); background: var(--bg-card); color: var(--text);
+  padding: 16px 10px; border-radius: 10px; text-align: center; transition: all 0.2s;
+}
+.mode-card:hover { border-color: var(--primary); }
+.mode-card.selected { border-color: var(--primary); background: rgba(26,58,107,0.06); }
+.mode-card .mode-icon { font-size: 28px; margin-bottom: 6px; }
+.mode-card .mode-name { font-size: 13px; font-weight: 600; }
+.mode-card .mode-desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+.qty-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.qty-row label { font-size: 14px; color: var(--text-muted); flex: 1; }
+.qty-row input[type=range] { flex: 2; accent-color: var(--primary); }
+.qty-badge { background: var(--primary); color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; min-width: 44px; text-align: center; }
+
+.btn-primary {
+  background: var(--primary); color: white; border: none;
+  padding: 14px 24px; border-radius: 10px; font-size: 15px; font-weight: 600;
+  width: 100%; transition: background 0.2s, transform 0.1s;
+}
+.btn-primary:hover { background: var(--primary-light); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== QUIZ ===== */
+.quiz-header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 16px 24px; position: sticky; top: 60px; z-index: 90; }
+.quiz-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.quiz-counter { font-weight: 600; font-size: 15px; }
+.timer-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--primary); color: white;
+  padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;
+}
+.timer-badge.warning { background: var(--warning); }
+.timer-badge.danger { background: var(--danger); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+
+.progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--primary); transition: width 0.4s ease; border-radius: 3px; }
+
+.question-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.q-dot {
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border);
+  background: var(--bg); font-size: 11px; font-weight: 600; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.q-dot.answered { background: var(--primary); border-color: var(--primary); color: white; }
+.q-dot.current { border-color: var(--primary); color: var(--primary); }
+.q-dot.skipped { background: #fef3c7; border-color: var(--warning); color: var(--warning); }
+
+.question-area { padding: 24px; }
+.course-tag { display: inline-block; background: rgba(26,58,107,0.1); color: var(--primary); padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; margin-bottom: 16px; }
+.question-text { font-size: 17px; font-weight: 500; line-height: 1.6; margin-bottom: 20px; color: var(--text); }
+.question-img { max-width: 100%; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border); }
+
+.options-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.option-item {
+  border: 2px solid var(--border); background: var(--bg-card);
+  padding: 14px 16px; border-radius: 10px; text-align: left;
+  font-size: 15px; color: var(--text); transition: all 0.2s; display: flex; align-items: flex-start; gap: 12px;
+}
+.option-item:hover:not(:disabled) { border-color: var(--primary); background: rgba(26,58,107,0.04); }
+.option-item.selected { border-color: var(--primary); background: rgba(26,58,107,0.08); }
+.option-item.correct { border-color: var(--success); background: #f0fdf4; color: #166534; }
+.option-item.wrong { border-color: var(--danger); background: #fff1f2; color: #991b1b; }
+.option-item:disabled { cursor: default; }
+.opt-letter { width: 26px; height: 26px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; transition: all 0.2s; }
+.option-item.selected .opt-letter { background: var(--primary); color: white; }
+.option-item.correct .opt-letter { background: var(--success); color: white; }
+.option-item.wrong .opt-letter { background: var(--danger); color: white; }
+
+.quiz-actions { display: flex; gap: 10px; padding: 0 24px 24px; }
+.btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+.btn-secondary:hover { background: var(--border); }
+.btn-next { flex: 1; }
+
+.explanation-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 16px; margin: 0 24px 24px; font-size: 14px; color: #166534; line-height: 1.6; display: none; }
+.explanation-box strong { display: block; margin-bottom: 4px; }
+
+/* ===== RESULTADOS ===== */
+.result-hero { text-align: center; padding: 32px 24px; }
+.result-score-ring { width: 140px; height: 140px; margin: 0 auto 20px; position: relative; }
+.result-score-ring svg { transform: rotate(-90deg); }
+.result-score-ring .score-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.result-score-ring .score-num { font-size: 32px; font-weight: 800; color: var(--primary); }
+.result-score-ring .score-label { font-size: 12px; color: var(--text-muted); }
+.result-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.result-subtitle { color: var(--text-muted); font-size: 15px; }
+
+.result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+.stat-box { background: var(--bg); border-radius: 10px; padding: 14px; text-align: center; }
+.stat-box .stat-num { font-size: 22px; font-weight: 700; }
+.stat-box .stat-lbl { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.stat-box.green .stat-num { color: var(--success); }
+.stat-box.red .stat-num { color: var(--danger); }
+.stat-box.blue .stat-num { color: var(--primary); }
+
+/* ===== RANKING ===== */
+.ranking-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.rank-pos { width: 32px; text-align: center; font-weight: 700; font-size: 15px; }
+.rank-pos.gold { color: #ca8a04; }
+.rank-pos.silver { color: #64748b; }
+.rank-pos.bronze { color: #92400e; }
+.rank-bar-wrap { flex: 1; }
+.rank-label { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+.rank-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.rank-fill { height: 100%; border-radius: 4px; background: var(--primary); transition: width 1s ease; }
+.rank-fill.you { background: var(--accent); }
+.rank-pct { font-weight: 700; font-size: 14px; min-width: 44px; text-align: right; }
+.you-badge { background: var(--accent); color: #1e293b; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+
+/* ===== HISTORIAL / STATS ===== */
+.history-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.history-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.history-icon.sim { background: rgba(26,58,107,0.1); }
+.history-icon.lib { background: rgba(22,163,74,0.1); }
+.history-icon.rep { background: rgba(217,119,6,0.1); }
+.history-info { flex: 1; }
+.history-info strong { font-size: 14px; }
+.history-info p { font-size: 12px; color: var(--text-muted); }
+.history-score { font-weight: 700; font-size: 16px; }
+
+/* ===== ADMIN ===== */
+.admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.admin-stat { background: var(--bg); border-radius: 10px; padding: 16px; }
+.admin-stat .num { font-size: 28px; font-weight: 800; color: var(--primary); }
+.admin-stat .lbl { font-size: 12px; color: var(--text-muted); }
+
+.tab-row { display: flex; gap: 4px; background: var(--bg); border-radius: 10px; padding: 4px; margin-bottom: 20px; }
+.tab-btn { flex: 1; padding: 8px; border: none; background: transparent; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-muted); transition: all 0.2s; }
+.tab-btn.active { background: var(--bg-card); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--bg-card); border-top: 1px solid var(--border);
+  display: flex; z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+}
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 4px; gap: 3px; border: none; background: transparent; color: var(--text-muted); font-size: 11px; transition: color 0.2s; }
+.nav-btn.active { color: var(--primary); }
+.nav-btn .nav-icon { font-size: 22px; }
+.content-area { padding-bottom: 70px; }
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: #1e293b; color: white; padding: 12px 20px; border-radius: 10px;
+  font-size: 14px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 9999; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== OVERLAY ===== */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: flex-end; }
+.bottom-sheet { background: var(--bg-card); border-radius: 20px 20px 0 0; padding: 24px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.bottom-sheet h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 480px) {
+  .mode-grid { grid-template-columns: 1fr; }
+  .result-stats { grid-template-columns: 1fr 1fr; }
+  .admin-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+</head>
+<body>
+
+<!-- LOADER -->
+
+<div id="loader">
+  <div class="logo">🏥</div>
+  <h1>MEDIC DR</h1>
+  <p>Cargando banco de preguntas...</p>
+  <div class="spinner"></div>
+</div>
+
+<!-- TOAST -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ==================== SCREEN: LOGIN ==================== -->
+
+<div id="screen-login" class="hidden">
+  <div class="login-card">
+    <div class="login-logo">🏥</div>
+    <div class="login-title">MEDIC DR</div>
+    <div class="login-subtitle">Banco de Preguntas Médicas<br>Academia MedicDrac</div>
+    <hr class="login-divider">
+    <div id="g_id_onload"
+      data-client_id="894966407588-qvi7l21hbbe7eng7a224vp7ika9tp6rh.apps.googleusercontent.com"
+      data-context="signin"
+      data-ux_mode="popup"
+      data-callback="handleGoogleLogin"
+      data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin"
+      data-type="standard"
+      data-shape="rectangular"
+      data-theme="outline"
+      data-text="signin_with"
+      data-size="large"
+      data-logo_alignment="left"
+      data-width="300">
+    </div>
+    <div id="login-error" class="error-msg"></div>
+    <p class="login-note">Solo pueden ingresar alumnos registrados en la academia.<br>Debes usar el mismo dispositivo siempre.</p>
+  </div>
+</div>
+
+<!-- ==================== APP (POST LOGIN) ==================== -->
+
+<div id="app" class="hidden">
+
+  <!-- HEADER -->
+
+  <div class="app-header">
+    <div class="brand"><span>🏥</span> MEDIC DR</div>
+    <div class="user-info">
+      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar modo">🌙</button>
+      <div class="avatar" id="user-avatar">?</div>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <!-- CONTENT AREA -->
+
+  <div class="content-area">
+
+```
+<!-- ===== PANTALLA: INICIO / SELECCIÓN ===== -->
+<div id="screen-inicio" class="hidden container">
+  <div class="welcome-banner">
+    <h2 id="welcome-name">Bienvenido 👋</h2>
+    <p>Selecciona lo que quieres practicar hoy</p>
+    <span class="badge-univ" id="badge-univ"></span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="section-title">Ciclo</div>
+    <div id="ciclo-info" style="font-size:15px; font-weight:600; color:var(--primary); padding: 10px 14px; background: rgba(26,58,107,0.06); border-radius:8px;"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div class="section-title" style="margin-bottom:0;">Cursos (puedes elegir varios)</div>
+      <button onclick="selectAll('cursos')" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);cursor:pointer;">Todos</button>
+    </div>
+    <div class="option-grid" id="cursos-grid"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div class="section-title" style="margin-bottom:0;">Semanas (puedes elegir varias)</div>
+      <button onclick="selectAll('semanas')" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);cursor:pointer;">Todas</button>
+    </div>
+    <div class="option-grid" id="semanas-grid"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="section-title">Modalidad</div>
+    <div class="mode-grid" id="mode-grid">
+      <button class="mode-card" onclick="selectMode('libre')" id="mode-libre">
+        <div class="mode-icon">📖</div>
+        <div class="mode-name">Práctica Libre</div>
+        <div class="mode-desc">Sin tiempo</div>
+      </button>
+      <button class="mode-card" onclick="selectMode('simulacro')" id="mode-simulacro">
+        <div class="mode-icon">⏱️</div>
+        <div class="mode-name">Simulacro</div>
+        <div class="mode-desc">1 min/pregunta</div>
+      </button>
+      <button class="mode-card" onclick="selectMode('repaso')" id="mode-repaso">
+        <div class="mode-icon">🔄</div>
+        <div class="mode-name">Mis Errores</div>
+        <div class="mode-desc">Repaso</div>
+      </button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px;">
+    <div class="section-title">Cantidad de preguntas</div>
+    <div class="qty-row">
+      <label>Preguntas:</label>
+      <input type="range" id="qty-slider" min="5" max="50" step="5" value="20" oninput="updateQty(this.value)">
+      <div class="qty-badge" id="qty-display">20</div>
+    </div>
+    <p id="time-estimate" style="font-size:12px; color:var(--text-muted); margin-top:8px;"></p>
+  </div>
+
+  <button class="btn-primary" id="btn-start" onclick="startQuiz()" disabled>Comenzar práctica →</button>
+</div>
+
+<!-- ===== PANTALLA: QUIZ ===== -->
+<div id="screen-quiz" class="hidden">
+  <div class="quiz-header">
+    <div class="quiz-meta">
+      <span class="quiz-counter" id="quiz-counter">Pregunta 1 de 20</span>
+      <span class="timer-badge" id="timer-badge" style="display:none;">⏱️ 20:00</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="quiz-progress" style="width:5%"></div>
+    </div>
+  </div>
+  <div class="question-nav" id="question-nav"></div>
+  <div class="question-area">
+    <div class="course-tag" id="q-course-tag"></div>
+    <img id="q-image" class="question-img hidden" src="" alt="Imagen de pregunta">
+    <div class="question-text" id="q-text"></div>
+    <div class="options-list" id="options-list"></div>
+    <div class="explanation-box" id="explanation-box">
+      <strong>💡 Explicación:</strong>
+      <span id="explanation-text"></span>
+    </div>
+  </div>
+  <div class="quiz-actions">
+    <button class="btn-secondary" onclick="skipQuestion()">Saltar →</button>
+    <button class="btn-primary btn-next" id="btn-next" onclick="nextQuestion()">Siguiente →</button>
+    <button class="btn-secondary" id="btn-finish-early" onclick="confirmFinish()" style="background:#fee2e2; border-color:#fca5a5; color:#dc2626;">Terminar</button>
+  </div>
+</div>
+
+<!-- ===== PANTALLA: RESULTADOS ===== -->
+<div id="screen-resultados" class="hidden container">
+  <div class="card result-hero">
+    <div class="result-score-ring">
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        <circle cx="70" cy="70" r="60" fill="none" stroke="var(--border)" stroke-width="12"/>
+        <circle cx="70" cy="70" r="60" fill="none" stroke="var(--primary)" stroke-width="12"
+          stroke-dasharray="377" stroke-dashoffset="377" id="score-ring" stroke-linecap="round" style="transition:stroke-dashoffset 1.2s ease;"/>
+      </svg>
+      <div class="score-text">
+        <div class="score-num" id="result-pct">0%</div>
+        <div class="score-label">Puntaje</div>
+      </div>
+    </div>
+    <div class="result-title" id="result-msg">¡Buen trabajo!</div>
+    <div class="result-subtitle" id="result-sub"></div>
+    <div class="result-stats">
+      <div class="stat-box green"><div class="stat-num" id="stat-correct">0</div><div class="stat-lbl">Correctas</div></div>
+      <div class="stat-box red"><div class="stat-num" id="stat-wrong">0</div><div class="stat-lbl">Incorrectas</div></div>
+      <div class="stat-box blue"><div class="stat-num" id="stat-skip">0</div><div class="stat-lbl">Sin responder</div></div>
+    </div>
+    <div style="font-size:13px; color:var(--text-muted); margin-top:8px;" id="stat-time"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px;" id="ranking-card">
+    <div class="section-title">📊 Ranking de esta semana</div>
+    <div id="ranking-list"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px;" id="errors-card">
+    <div class="section-title">❌ Preguntas incorrectas</div>
+    <div id="errors-list"></div>
+  </div>
+
+  <div style="display:flex; gap:10px; margin-top:16px;">
+    <button class="btn-secondary" style="flex:1;" onclick="goToInicio()">← Volver</button>
+    <button class="btn-primary" style="flex:1;" onclick="startRepaso()">Repasar errores 🔄</button>
+  </div>
+</div>
+
+<!-- ===== PANTALLA: HISTORIAL ===== -->
+<div id="screen-historial" class="hidden container">
+  <h2 style="font-size:20px; font-weight:700; margin-bottom:20px;">📈 Mi historial</h2>
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="showHistTab('sesiones')" id="htab-sesiones">Sesiones</button>
+    <button class="tab-btn" onclick="showHistTab('cursos')" id="htab-cursos">Por curso</button>
+    <button class="tab-btn" onclick="showHistTab('ranking')" id="htab-ranking">Ranking</button>
+  </div>
+  <div id="hist-sesiones"></div>
+  <div id="hist-cursos" class="hidden"></div>
+  <div id="hist-ranking" class="hidden"></div>
+</div>
+
+<!-- ===== PANTALLA: ADMIN ===== -->
+<div id="screen-admin" class="hidden container">
+  <h2 style="font-size:20px; font-weight:700; margin-bottom:20px;">⚙️ Panel Admin</h2>
+  <div class="admin-grid" id="admin-stats"></div>
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="showAdminTab('global')" id="atab-global">Global</button>
+    <button class="tab-btn" onclick="showAdminTab('preguntas')" id="atab-preguntas">Preguntas</button>
+    <button class="tab-btn" onclick="showAdminTab('alumnos')" id="atab-alumnos">Alumnos</button>
+  </div>
+  <div id="admin-global"></div>
+  <div id="admin-preguntas" class="hidden"></div>
+  <div id="admin-alumnos" class="hidden"></div>
+</div>
+```
+
+  </div><!-- end content-area -->
+
+  <!-- BOTTOM NAV -->
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-inicio" onclick="navigateTo('inicio')">
+      <span class="nav-icon">🏠</span><span>Inicio</span>
+    </button>
+    <button class="nav-btn" id="nav-historial" onclick="navigateTo('historial')">
+      <span class="nav-icon">📊</span><span>Historial</span>
+    </button>
+    <button class="nav-btn hidden" id="nav-admin" onclick="navigateTo('admin')">
+      <span class="nav-icon">⚙️</span><span>Admin</span>
+    </button>
+  </div>
+
+</div><!-- end app -->
+
+<!-- OVERLAY CONFIRMAR TERMINAR -->
+
+<div id="overlay-finish" class="overlay hidden">
+  <div class="bottom-sheet">
+    <h3>¿Terminar el examen?</h3>
+    <p style="color:var(--text-muted); margin-bottom:20px; font-size:14px;">Las preguntas sin responder contarán como incorrectas.</p>
+    <button class="btn-primary" onclick="submitQuiz()" style="margin-bottom:10px;">Sí, enviar examen</button>
+    <button class="btn-secondary" style="width:100%;" onclick="document.getElementById('overlay-finish').classList.add('hidden')">Seguir respondiendo</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURACIÓN — EDITAR ESTOS VALORES
+// ============================================================
+const CONFIG = {
+  GOOGLE_CLIENT_ID: '894966407588-qvi7l21hbbe7eng7a224vp7ika9tp6rh.apps.googleusercontent.com',      // ✅ Configurado
+  SHEET_ID: '1xqTDyrPPnbKxgsBpBo_t0_dL0IN5m21zT2bJ2jLWWLQ',           // ✅ Sheet único (alumnos + preguntas + resultados)
+  SHEET_ID_PREGUNTAS: '1xqTDyrPPnbKxgsBpBo_t0_dL0IN5m21zT2bJ2jLWWLQ', // ✅ Mismo Sheet
+  GID_ALUMNOS: '810116038',                       // ✅ Actualizado
+  GID_PREGUNTAS: '2045185260',                    // ✅ Configurado
+  GID_RESULTADOS: '786621854',                    // ✅ Configurado
+  GID_RESPUESTAS: '115941362',                    // ✅ Configurado
+  SHEETS_API_KEY: 'AIzaSyCDaS1ncNBBborldXv1gjbX1YHY31vvzQA',                   // ✅ Configurado
+  ADMIN_EMAIL: 'eduma2904@gmail.com',             // ✅ Configurado
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzGMDh8vM570ko7qkdUn9b0zRQsUBKHQ8x4g8etBX07LtZFh-sPOrd1iSAJoTBKzNbH/exec',              // ✅ Configurado
+};
+
+// ============================================================
+// MAPEO CICLOS → CURSOS
+// ============================================================
+const CURSOS_POR_CICLO = {
+  'UPN': {
+    'I CICLO':   ['Biología', 'Epidemiología', 'Morfología 1'],
+    'II CICLO':  ['Biología', 'Epidemiología', 'Morfología 1'],
+    'III CICLO': ['Agresión', 'Epidemiología', 'Farmacología'],
+    'V CICLO':   ['Digestivo', 'Epidemiología', 'Hematología', 'Integración', 'Locomotor', 'PMI IV'],
+    'FARMACOLOGIA + PMII':          ['Farmacología', 'PMI II'],
+    'EXCRETOR':                     ['Excretor'],
+    'MORFO 1 2026-1':               ['Morfología 1'],
+    'TEGUMENTARIO + NERVIOSO + AGRESION': ['Tegumentario', 'Nervioso', 'Agresión'],
+  },
+  'WIENER': {
+    'BIOLOGIA NW': ['Biología'],
+    'I CICLO':     ['Biología'],
+    'II CICLO':    ['Biología'],
+  }
+};
+
+const SEMANAS = ['Semana 1','Semana 2','Semana 3','Semana 4','Semana 5','Semana 6','Semana 7','Semana 8','Semana 9','Semana 10','Semana 11','Semana 12','Semana 13','Semana 14','Semana 15','Semana 16'];
+
+// ============================================================
+// ESTADO GLOBAL
+// ============================================================
+let STATE = {
+  user: null,         // { email, name, picture, universidad, ciclo, cursos_permitidos }
+  deviceId: null,
+  preguntas: [],      // todas las preguntas cargadas
+  quiz: {
+    questions: [],
+    current: 0,
+    answers: {},      // idx → { selected, correct, opciones_shuffled }
+    startTime: null,
+    timer: null,
+    timeLeft: 0,
+    mode: null,
+  },
+  selection: {
+    cursos: [],
+    semanas: [],
+    mode: null,
+    qty: 20,
+  },
+  historial: [],
+  rankingData: [],
+};
+
+// ============================================================
+// TEMA OSCURO / CLARO
+// ============================================================
+function toggleTheme() {
+  const dark = document.body.classList.toggle('dark');
+  localStorage.setItem('medicdr_theme', dark ? 'dark' : 'light');
+  document.getElementById('btn-theme').textContent = dark ? '☀️' : '🌙';
+}
+
+function applyTheme() {
+  const saved = localStorage.getItem('medicdr_theme');
+  // Si no hay preferencia guardada, detectar sistema
+  const prefersDark = !saved && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (saved === 'dark' || prefersDark) {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = '☀️';
+  }
+}
+
+// ============================================================
+// SELECCIONAR TODOS (cursos / semanas)
+// ============================================================
+function selectAll(type) {
+  if (type === 'cursos') {
+    const cursos = getCursosDisponibles();
+    const todosSeleccionados = cursos.every(c => STATE.selection.cursos.includes(c));
+    if (todosSeleccionados) {
+      // Deseleccionar todos
+      STATE.selection.cursos = [];
+      document.querySelectorAll('#cursos-grid .option-btn').forEach(b => b.classList.remove('selected'));
+    } else {
+      // Seleccionar todos
+      STATE.selection.cursos = [...cursos];
+      document.querySelectorAll('#cursos-grid .option-btn').forEach(b => b.classList.add('selected'));
+    }
+  } else if (type === 'semanas') {
+    const todosSeleccionados = SEMANAS.every(s => STATE.selection.semanas.includes(s));
+    if (todosSeleccionados) {
+      STATE.selection.semanas = [];
+      document.querySelectorAll('#semanas-grid .option-btn').forEach(b => b.classList.remove('selected'));
+    } else {
+      STATE.selection.semanas = [...SEMANAS];
+      document.querySelectorAll('#semanas-grid .option-btn').forEach(b => b.classList.add('selected'));
+    }
+  }
+  checkCanStart();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  applyTheme();
+  // Fingerprint
+  const fp = await FingerprintJS.load();
+  const result = await fp.get();
+  STATE.deviceId = result.visitorId;
+
+  // Check si ya tiene sesión guardada
+  const savedUser = localStorage.getItem('medicdr_user');
+  if (savedUser) {
+    STATE.user = JSON.parse(savedUser);
+    await loadApp();
+  } else {
+    showLoader(false);
+    showScreen('login');
+  }
+}
+
+function showLoader(show) {
+  document.getElementById('loader').style.display = show ? 'flex' : 'none';
+}
+
+// ============================================================
+// AUTENTICACIÓN GOOGLE
+// ============================================================
+async function handleGoogleLogin(response) {
+  showLoader(true);
+  try {
+    const payload = parseJwt(response.credential);
+    const email = payload.email.toLowerCase().trim();
+    const name = payload.name;
+    const picture = payload.picture;
+
+    // Verificar en Google Sheets
+    const alumno = await verificarAlumno(email);
+    if (!alumno) {
+      showLoader(false);
+      showError('Tu correo no está registrado en la academia o tu acceso está inactivo.');
+      return;
+    }
+
+    // Verificar/registrar dispositivo
+    const dispositivoOk = await verificarDispositivo(email, STATE.deviceId);
+    if (!dispositivoOk) {
+      showLoader(false);
+      showError('Este correo ya está registrado en otro dispositivo. Contacta al admin para cambiarlo.');
+      return;
+    }
+
+    STATE.user = {
+      email, name, picture,
+      universidad: alumno.universidad,
+      ciclo: alumno.ciclo,
+      estado: alumno.estado,
+    };
+    localStorage.setItem('medicdr_user', JSON.stringify(STATE.user));
+    await loadApp();
+
+  } catch(e) {
+    showLoader(false);
+    showError('Error al iniciar sesión. Intenta de nuevo.');
+    console.error(e);
+  }
+}
+
+async function verificarAlumno(email) {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/ALUMNOS!A2:H300?key=${CONFIG.SHEETS_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rows = data.values || [];
+
+    for (const row of rows) {
+      const rowEmail = (row[2] || '').toLowerCase().trim();
+      if (rowEmail === email) {
+        const estado = (row[7] || '').toLowerCase();
+        if (estado === 'inactivo') return null;
+        const universidad = normalizeUniversidad(row[4], row[3]);
+        const ciclo = normalizeCiclo(row[3], universidad);
+        return { universidad, ciclo, estado: row[7] };
+      }
+    }
+    return null;
+  } catch(e) {
+    console.error('Error verificando alumno:', e);
+    return null;
+  }
+}
+
+function normalizeUniversidad(colE, colD) {
+  const e = (colE || '').toUpperCase();
+  if (e === 'WIENER' || e.includes('WIENER')) return 'WIENER';
+  if (e === 'BIOLOGIA NW') return 'WIENER';
+  if (e === 'UPN') return 'UPN';
+  // fallback por colD
+  if ((colD || '').includes('NW')) return 'WIENER';
+  return 'UPN';
+}
+
+function normalizeCiclo(colD, universidad) {
+  const d = (colD || '').toUpperCase().trim();
+  if (d.includes('I CICLO') && !d.includes('II') && !d.includes('III') && !d.includes('IV') && !d.includes('V')) return 'I CICLO';
+  if (d.includes('II CICLO') && !d.includes('III')) return 'II CICLO';
+  if (d.includes('III CICLO')) return 'III CICLO';
+  if (d.includes('IV CICLO')) return 'IV CICLO';
+  if (d.includes('V CICLO')) return 'V CICLO';
+  // cursos especiales → devolver tal cual
+  return colD;
+}
+
+async function verificarDispositivo(email, deviceId) {
+  if (!CONFIG.SCRIPT_URL || CONFIG.SCRIPT_URL.includes('TU_')) return true;
+  try {
+    const res = await fetch(CONFIG.SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'verificarDispositivo',
+        data: { email, device_id: deviceId }
+      }),
+    });
+    const json = await res.json();
+    if (!json.ok) {
+      if (json.msg === 'no_registrado') {
+        // No está en la lista de alumnos (ya se validó antes, no debería ocurrir)
+        return false;
+      }
+      if (json.msg === 'dispositivo_diferente') {
+        showError('⚠️ Este correo ya está activo en otro dispositivo. Contacta al administrador para cambiarlo.');
+        return false;
+      }
+      return false;
+    }
+    return true;
+  } catch(e) {
+    console.error('Error verificando dispositivo:', e);
+    // Si falla la conexión, permitir el acceso para no bloquear al alumno
+    return true;
+  }
+}
+
+function parseJwt(token) {
+  const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(atob(base64));
+}
+
+function logout() {
+  localStorage.removeItem('medicdr_user');
+  STATE.user = null;
+  location.reload();
+}
+
+function showError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ============================================================
+// CARGAR APP POST LOGIN
+// ============================================================
+async function loadApp() {
+  showLoader(true);
+  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  // Avatar
+  const av = document.getElementById('user-avatar');
+  if (STATE.user.picture) {
+    av.innerHTML = `<img src="${STATE.user.picture}" alt="">`;
+  } else {
+    av.textContent = STATE.user.name[0].toUpperCase();
+  }
+
+  // Mostrar admin si corresponde
+  if (STATE.user.email === CONFIG.ADMIN_EMAIL.toLowerCase()) {
+    document.getElementById('nav-admin').classList.remove('hidden');
+  }
+
+  // Cargar preguntas
+  await cargarPreguntas();
+  await cargarHistorial();
+
+  showLoader(false);
+  navigateTo('inicio');
+}
+
+// ============================================================
+// CARGAR PREGUNTAS DESDE SHEETS
+// ============================================================
+async function cargarPreguntas() {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID_PREGUNTAS}/values/PREGUNTAS!A2:M2000?key=${CONFIG.SHEETS_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rows = data.values || [];
+
+    STATE.preguntas = rows
+      .filter(r => r[0] && r[5])
+      .map((r, i) => ({
+        id: r[0] || `P${i}`,
+        universidad: (r[1] || '').toUpperCase().trim(),
+        ciclo: (r[2] || '').trim(),
+        curso: (r[3] || '').trim(),
+        semana: (r[4] || '').trim(),
+        pregunta: r[5] || '',
+        opA: r[6] || '',
+        opB: r[7] || '',
+        opC: r[8] || '',
+        opD: r[9] || '',
+        correcta: (r[10] || 'A').toUpperCase().trim(),
+        imagen: r[11] || '',
+        explicacion: r[12] || '',
+      }));
+
+    console.log(`${STATE.preguntas.length} preguntas cargadas`);
+  } catch(e) {
+    console.error('Error cargando preguntas:', e);
+    showToast('⚠️ No se pudieron cargar las preguntas');
+  }
+}
+
+async function cargarHistorial() {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID_PREGUNTAS}/values/RESULTADOS!A2:L500?key=${CONFIG.SHEETS_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rows = data.values || [];
+    const email = STATE.user.email;
+
+    STATE.historial = rows
+      .filter(r => (r[1]||'').toLowerCase() === email)
+      .map(r => ({
+        fecha: r[0], alumno_id: r[1], universidad: r[2], ciclo: r[3],
+        cursos: r[4], semanas: r[5], modalidad: r[6],
+        correctas: +r[7]||0, total: +r[8]||0, porcentaje: +r[9]||0,
+        duracion: r[10], semana_iso: r[11]
+      }))
+      .reverse();
+  } catch(e) {
+    console.error('Error cargando historial:', e);
+  }
+}
+
+// ============================================================
+// NAVEGACIÓN
+// ============================================================
+function navigateTo(screen) {
+  ['inicio','historial','admin'].forEach(s => {
+    document.getElementById(`screen-${s}`)?.classList.add('hidden');
+    document.getElementById(`nav-${s}`)?.classList.remove('active');
+  });
+  document.getElementById('screen-quiz')?.classList.add('hidden');
+  document.getElementById('screen-resultados')?.classList.add('hidden');
+
+  document.getElementById(`screen-${screen}`)?.classList.remove('hidden');
+  document.getElementById(`nav-${screen}`)?.classList.add('active');
+
+  if (screen === 'inicio') renderInicio();
+  if (screen === 'historial') renderHistorial();
+  if (screen === 'admin') renderAdmin();
+}
+
+function showScreen(name) {
+  document.getElementById('loader').style.display = 'none';
+  if (name === 'login') {
+    document.getElementById('screen-login').classList.remove('hidden');
+  }
+}
+
+// ============================================================
+// PANTALLA INICIO
+// ============================================================
+function renderInicio() {
+  const u = STATE.user;
+  document.getElementById('welcome-name').textContent = `Hola, ${u.name.split(' ')[0]} 👋`;
+  document.getElementById('badge-univ').textContent = u.universidad === 'WIENER' ? 'Norbert Wiener' : 'UPN';
+  document.getElementById('ciclo-info').textContent = u.ciclo;
+
+  // Cursos disponibles
+  const cursos = getCursosDisponibles();
+  const cursosGrid = document.getElementById('cursos-grid');
+  cursosGrid.innerHTML = '';
+  cursos.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.textContent = c;
+    btn.dataset.value = c;
+    btn.onclick = () => toggleOption(btn, 'cursos');
+    cursosGrid.appendChild(btn);
+  });
+
+  // Semanas
+  const semanasGrid = document.getElementById('semanas-grid');
+  semanasGrid.innerHTML = '';
+  SEMANAS.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.textContent = s.replace('Semana ','S');
+    btn.dataset.value = s;
+    btn.onclick = () => toggleOption(btn, 'semanas');
+    semanasGrid.appendChild(btn);
+  });
+
+  // Reset selection
+  STATE.selection = { cursos: [], semanas: [], mode: null, qty: 20 };
+  document.querySelectorAll('.mode-card').forEach(b => b.classList.remove('selected'));
+  updateQty(20);
+  checkCanStart();
+}
+
+function getCursosDisponibles() {
+  const { universidad, ciclo } = STATE.user;
+  const map = CURSOS_POR_CICLO[universidad] || CURSOS_POR_CICLO['UPN'];
+  return map[ciclo] || map[Object.keys(map)[0]] || [];
+}
+
+function toggleOption(btn, type) {
+  const val = btn.dataset.value;
+  const arr = STATE.selection[type];
+  const idx = arr.indexOf(val);
+  if (idx > -1) {
+    arr.splice(idx, 1);
+    btn.classList.remove('selected');
+  } else {
+    arr.push(val);
+    btn.classList.add('selected');
+  }
+  checkCanStart();
+}
+
+function selectMode(mode) {
+  STATE.selection.mode = mode;
+  document.querySelectorAll('.mode-card').forEach(b => b.classList.remove('selected'));
+  document.getElementById(`mode-${mode}`).classList.add('selected');
+  updateQty(STATE.selection.qty);
+  checkCanStart();
+}
+
+function updateQty(val) {
+  STATE.selection.qty = +val;
+  document.getElementById('qty-display').textContent = val;
+  document.getElementById('qty-slider').value = val;
+  if (STATE.selection.mode === 'simulacro') {
+    document.getElementById('time-estimate').textContent = `⏱ Duración máxima: ${val} minutos`;
+  } else {
+    document.getElementById('time-estimate').textContent = '';
+  }
+}
+
+function checkCanStart() {
+  const { cursos, semanas, mode } = STATE.selection;
+  const ok = cursos.length > 0 && semanas.length > 0 && mode !== null;
+  document.getElementById('btn-start').disabled = !ok;
+}
+
+// ============================================================
+// INICIO DEL QUIZ
+// ============================================================
+function startQuiz() {
+  const { cursos, semanas, mode, qty } = STATE.selection;
+
+  let pool = STATE.preguntas.filter(p => {
+    const cursMatch = cursos.some(c => p.curso.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(p.curso.toLowerCase()));
+    const semMatch = semanas.some(s => p.semana.toLowerCase() === s.toLowerCase());
+    const univMatch = p.universidad === STATE.user.universidad || p.universidad === '' || p.universidad === 'AMBAS';
+    return cursMatch && semMatch && univMatch;
+  });
+
+  if (mode === 'repaso') {
+    // Filtrar solo preguntas que el alumno respondió mal
+    const errores = getErrorIds();
+    if (errores.length === 0) {
+      showToast('¡No tienes errores registrados! 🎉');
+      return;
+    }
+    pool = pool.filter(p => errores.includes(p.id));
+  }
+
+  if (pool.length === 0) {
+    showToast('No hay preguntas para tu selección. Agrega preguntas a la base de datos.');
+    return;
+  }
+
+  // Shuffle y limitar
+  pool = shuffle(pool).slice(0, Math.min(qty, pool.length));
+
+  // Shuffle opciones de cada pregunta
+  pool = pool.map(p => {
+    const opciones = [
+      { letra: 'A', texto: p.opA },
+      { letra: 'B', texto: p.opB },
+      { letra: 'C', texto: p.opC },
+      { letra: 'D', texto: p.opD },
+    ].filter(o => o.texto);
+    const shuffled = shuffle(opciones);
+    return { ...p, opciones_shuffled: shuffled };
+  });
+
+  STATE.quiz = {
+    questions: pool,
+    current: 0,
+    answers: {},
+    startTime: Date.now(),
+    timer: null,
+    timeLeft: mode === 'simulacro' ? pool.length * 60 : 0,
+    mode,
+  };
+
+  renderQuiz();
+  navigateToScreen('quiz');
+
+  if (mode === 'simulacro') startTimer();
+}
+
+function navigateToScreen(name) {
+  ['inicio','historial','admin','quiz','resultados'].forEach(s => {
+    document.getElementById(`screen-${s}`)?.classList.add('hidden');
+  });
+  document.getElementById(`screen-${name}`)?.classList.remove('hidden');
+}
+
+// ============================================================
+// RENDER QUIZ
+// ============================================================
+function renderQuiz() {
+  const { questions, current, answers, mode, timeLeft } = STATE.quiz;
+  const q = questions[current];
+  const total = questions.length;
+
+  // Header
+  document.getElementById('quiz-counter').textContent = `Pregunta ${current + 1} de ${total}`;
+  document.getElementById('quiz-progress').style.width = `${((current + 1) / total) * 100}%`;
+
+  // Timer
+  const timerEl = document.getElementById('timer-badge');
+  if (mode === 'simulacro') {
+    timerEl.style.display = 'flex';
+    updateTimerDisplay();
+  } else {
+    timerEl.style.display = 'none';
+  }
+
+  // Nav dots
+  const nav = document.getElementById('question-nav');
+  nav.innerHTML = '';
+  questions.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'q-dot';
+    dot.textContent = i + 1;
+    if (answers[i]?.selected) dot.classList.add('answered');
+    if (answers[i]?.skipped) dot.classList.add('skipped');
+    if (i === current) dot.classList.add('current');
+    dot.onclick = () => goToQuestion(i);
+    nav.appendChild(dot);
+  });
+
+  // Course tag
+  document.getElementById('q-course-tag').textContent = `${q.curso} · ${q.semana}`;
+
+  // Imagen
+  const imgEl = document.getElementById('q-image');
+  if (q.imagen) {
+    imgEl.src = q.imagen;
+    imgEl.classList.remove('hidden');
+  } else {
+    imgEl.classList.add('hidden');
+  }
+
+  // Pregunta
+  document.getElementById('q-text').textContent = q.pregunta;
+
+  // Opciones
+  const optList = document.getElementById('options-list');
+  optList.innerHTML = '';
+  const letras = ['A','B','C','D'];
+  const esSimulacro = STATE.quiz.mode === 'simulacro';
+  const examenTerminado = STATE.quiz.terminado; // flag que se activa al submit
+
+  q.opciones_shuffled.forEach((op, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-item';
+    btn.dataset.letra = op.letra;
+    btn.innerHTML = `<span class="opt-letter">${letras[i]}</span><span>${op.texto}</span>`;
+
+    const ans = answers[current];
+    if (ans?.selected) {
+      // En simulacro NO mostrar verde/rojo hasta que termine
+      if (!esSimulacro || examenTerminado) {
+        btn.disabled = true;
+        if (op.letra === q.correcta) btn.classList.add('correct');
+        if (op.letra === ans.selected && ans.selected !== q.correcta) btn.classList.add('wrong');
+      }
+      if (op.letra === ans.selected) btn.classList.add('selected');
+      if (esSimulacro && !examenTerminado) {
+        // En simulacro activo: puede cambiar respuesta
+        btn.onclick = () => selectAnswer(op.letra, q.correcta);
+      } else {
+        btn.disabled = true;
+      }
+    } else {
+      btn.onclick = () => selectAnswer(op.letra, q.correcta);
+    }
+    optList.appendChild(btn);
+  });
+
+  // Explicación
+  const expBox = document.getElementById('explanation-box');
+  if (answers[current]?.selected && q.explicacion) {
+    document.getElementById('explanation-text').textContent = q.explicacion;
+    expBox.style.display = 'block';
+  } else {
+    expBox.style.display = 'none';
+  }
+
+  // Botón siguiente
+  const btnNext = document.getElementById('btn-next');
+  if (current === total - 1) {
+    btnNext.textContent = 'Finalizar ✓';
+    btnNext.onclick = () => confirmFinish();
+  } else {
+    btnNext.textContent = 'Siguiente →';
+    btnNext.onclick = () => nextQuestion();
+  }
+}
+
+function selectAnswer(letraElegida, correcta) {
+  const { current } = STATE.quiz;
+  STATE.quiz.answers[current] = {
+    selected: letraElegida,
+    correct: letraElegida === correcta,
+    skipped: false,
+  };
+  renderQuiz();
+}
+
+function skipQuestion() {
+  const { current, questions, answers } = STATE.quiz;
+  if (!answers[current]) {
+    STATE.quiz.answers[current] = { selected: null, correct: false, skipped: true };
+  }
+  if (current < questions.length - 1) {
+    STATE.quiz.current++;
+    renderQuiz();
+  } else {
+    confirmFinish();
+  }
+}
+
+function nextQuestion() {
+  const { current, questions } = STATE.quiz;
+  if (current < questions.length - 1) {
+    STATE.quiz.current++;
+    renderQuiz();
+  } else {
+    confirmFinish();
+  }
+}
+
+function goToQuestion(idx) {
+  STATE.quiz.current = idx;
+  renderQuiz();
+}
+
+function confirmFinish() {
+  document.getElementById('overlay-finish').classList.remove('hidden');
+}
+
+// ============================================================
+// TIMER
+// ============================================================
+function startTimer() {
+  STATE.quiz.timer = setInterval(() => {
+    STATE.quiz.timeLeft--;
+    updateTimerDisplay();
+    if (STATE.quiz.timeLeft <= 0) {
+      clearInterval(STATE.quiz.timer);
+      submitQuiz();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const t = STATE.quiz.timeLeft;
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  const el = document.getElementById('timer-badge');
+  el.textContent = `⏱️ ${m}:${s.toString().padStart(2,'0')}`;
+  el.className = 'timer-badge';
+  const total = STATE.quiz.questions.length * 60;
+  const pct = t / total;
+  if (pct < 0.15) el.classList.add('danger');
+  else if (pct < 0.3) el.classList.add('warning');
+}
+
+// ============================================================
+// SUBMIT QUIZ
+// ============================================================
+async function submitQuiz() {
+  clearInterval(STATE.quiz.timer);
+  document.getElementById('overlay-finish').classList.add('hidden');
+
+  const { questions, answers, startTime, mode } = STATE.quiz;
+  
+  // Marcar como terminado para que renderQuiz muestre colores
+  STATE.quiz.terminado = true;
+
+  const total = questions.length;
+  let correctas = 0, incorrectas = 0, sinResponder = 0;
+
+  questions.forEach((q, i) => {
+    const ans = answers[i];
+    if (!ans || ans.skipped || !ans.selected) sinResponder++;
+    else if (ans.correct) correctas++;
+    else incorrectas++;
+  });
+
+  const pct = Math.round((correctas / total) * 100);
+  const duracion = Math.round((Date.now() - startTime) / 1000);
+
+  // Guardar resultado
+  await guardarResultado({
+    fecha: new Date().toISOString(),
+    alumno_id: STATE.user.email,
+    universidad: STATE.user.universidad,
+    ciclo: STATE.user.ciclo,
+    cursos: STATE.selection.cursos.join(','),
+    semanas: STATE.selection.semanas.join(','),
+    modalidad: mode,
+    correctas, total, porcentaje: pct,
+    duracion: `${Math.floor(duracion/60)}m ${duracion%60}s`,
+    semana_iso: getWeekISO(),
+  });
+
+  // Guardar respuestas detalle
+  await guardarRespuestasDetalle(questions, answers);
+
+  // Recargar historial
+  await cargarHistorial();
+
+  // Mostrar resultados
+  renderResultados(correctas, incorrectas, sinResponder, total, pct, duracion, questions, answers);
+  navigateToScreen('resultados');
+}
+
+async function guardarResultado(data) {
+  if (!CONFIG.SCRIPT_URL || CONFIG.SCRIPT_URL.includes('TU_')) return;
+  try {
+    await fetch(CONFIG.SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'guardarResultado', data }),
+    });
+  } catch(e) { console.error('Error guardando resultado:', e); }
+}
+
+async function guardarRespuestasDetalle(questions, answers) {
+  if (!CONFIG.SCRIPT_URL || CONFIG.SCRIPT_URL.includes('TU_')) return;
+  const sesionId = Date.now();
+  const filas = questions.map((q, i) => ({
+    fecha: new Date().toISOString(),
+    alumno_id: STATE.user.email,
+    sesion_id: sesionId,
+    pregunta_id: q.id,
+    respondio: answers[i]?.selected || '',
+    correcto: answers[i]?.correct ? 1 : 0,
+  }));
+  try {
+    await fetch(CONFIG.SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'guardarRespuestas', data: filas }),
+    });
+  } catch(e) { console.error('Error guardando respuestas:', e); }
+}
+
+// ============================================================
+// RESULTADOS
+// ============================================================
+function renderResultados(correctas, incorrectas, sinResponder, total, pct, duracion, questions, answers) {
+  // Anillo
+  const offset = 377 - (377 * pct / 100);
+  setTimeout(() => {
+    document.getElementById('score-ring').style.strokeDashoffset = offset;
+    const color = pct >= 70 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+    document.getElementById('score-ring').style.stroke = color;
+  }, 100);
+
+  document.getElementById('result-pct').textContent = `${pct}%`;
+  document.getElementById('stat-correct').textContent = correctas;
+  document.getElementById('stat-wrong').textContent = incorrectas;
+  document.getElementById('stat-skip').textContent = sinResponder;
+  document.getElementById('stat-time').textContent = `⏱ Tiempo: ${Math.floor(duracion/60)}m ${duracion%60}s`;
+
+  let msg, sub;
+  if (pct >= 80) { msg = '¡Excelente! 🏆'; sub = 'Dominas muy bien este tema'; }
+  else if (pct >= 60) { msg = '¡Buen trabajo! 💪'; sub = 'Sigue practicando para mejorar'; }
+  else if (pct >= 40) { msg = 'Puedes mejorar 📚'; sub = 'Repasa los errores y vuelve a intentarlo'; }
+  else { msg = 'Necesitas repasar 🔄'; sub = 'Revisa el material y practica más'; }
+  document.getElementById('result-msg').textContent = msg;
+  document.getElementById('result-sub').textContent = sub;
+
+  // Ranking
+  renderRankingResultados();
+
+  // Errores — comparar con la letra original de la pregunta
+  const errorsList = document.getElementById('errors-list');
+  const errores = questions.reduce((acc, q, i) => {
+    const ans = answers[i];
+    if (ans && ans.selected && ans.selected !== q.correcta) {
+      acc.push({ q, ans, i });
+    }
+    return acc;
+  }, []);
+
+  if (errores.length === 0) {
+    errorsList.innerHTML = '<p style="color:var(--text-muted); font-size:14px; padding:8px 0;">¡Sin errores! 🎉</p>';
+    document.getElementById('errors-card').style.display = 'none';
+  } else {
+    document.getElementById('errors-card').style.display = 'block';
+    errorsList.innerHTML = errores.slice(0, 5).map(({ q, ans }) => {
+      // Encontrar el texto de la opción respondida y la correcta en opciones_shuffled
+      const opRespondida = q.opciones_shuffled.find(o => o.letra === ans.selected);
+      const opCorrecta = q.opciones_shuffled.find(o => o.letra === q.correcta);
+      return `
+        <div style="padding:12px 0; border-bottom:1px solid var(--border); font-size:13px;">
+          <div style="font-weight:500; margin-bottom:6px; color:var(--text);">${q.pregunta.substring(0,120)}${q.pregunta.length>120?'...':''}</div>
+          <div style="color:var(--danger);">✗ Tu respuesta: ${opRespondida ? opRespondida.texto : ans.selected}</div>
+          <div style="color:var(--success);">✓ Correcta: ${opCorrecta ? opCorrecta.texto : q.correcta}</div>
+        </div>`;
+    }).join('');
+    if (errores.length > 5) {
+      errorsList.innerHTML += `<p style="font-size:12px; color:var(--text-muted); padding-top:8px;">... y ${errores.length - 5} más. Usa "Repasar errores" para practicarlos.</p>`;
+    }
+  }
+}
+
+async function renderRankingResultados() {
+  const rankingList = document.getElementById('ranking-list');
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID_PREGUNTAS}/values/RESULTADOS!A2:L500?key=${CONFIG.SHEETS_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rows = (data.values || []).filter(r => r[11] === getWeekISO());
+
+    // Agrupar por alumno: mejor puntaje de la semana
+    const byAlumno = {};
+    rows.forEach(r => {
+      const id = r[1];
+      const pct = +r[9] || 0;
+      if (!byAlumno[id] || pct > byAlumno[id]) byAlumno[id] = pct;
+    });
+
+    const sorted = Object.entries(byAlumno).sort((a,b) => b[1]-a[1]);
+    const myEmail = STATE.user.email;
+    const myPos = sorted.findIndex(([id]) => id === myEmail) + 1;
+    const top5 = sorted.slice(0, 5);
+
+    if (sorted.length < 2) {
+      rankingList.innerHTML = '<p style="color:var(--text-muted); font-size:13px; padding:8px 0;">Aún no hay suficientes participantes esta semana.</p>';
+      return;
+    }
+
+    const maxPct = top5[0][1];
+    rankingList.innerHTML = top5.map(([id, pct], i) => {
+      const isMe = id === myEmail;
+      const posClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      return `
+        <div class="ranking-row">
+          <div class="rank-pos ${posClass}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</div>
+          <div class="rank-bar-wrap">
+            <div class="rank-label">${isMe ? 'Tú' : `Puesto #${i+1}`} ${isMe ? '<span class="you-badge">TÚ</span>' : ''}</div>
+            <div class="rank-bar"><div class="rank-fill ${isMe?'you':''}" style="width:${(pct/maxPct)*100}%"></div></div>
+          </div>
+          <div class="rank-pct">${pct}%</div>
+        </div>`;
+    }).join('');
+
+    if (myPos > 5) {
+      rankingList.innerHTML += `<div style="padding:8px 0; font-size:13px; color:var(--text-muted); text-align:center;">Tu posición esta semana: <strong>#${myPos}</strong> de ${sorted.length}</div>`;
+    }
+  } catch(e) {
+    rankingList.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No se pudo cargar el ranking.</p>';
+  }
+}
+
+function startRepaso() {
+  STATE.selection.mode = 'repaso';
+  startQuiz();
+}
+
+function goToInicio() {
+  navigateTo('inicio');
+}
+
+// ============================================================
+// HISTORIAL
+// ============================================================
+function renderHistorial() {
+  renderHistSesiones();
+  renderHistCursos();
+  renderHistRanking();
+}
+
+function showHistTab(tab) {
+  ['sesiones','cursos','ranking'].forEach(t => {
+    document.getElementById(`hist-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`htab-${t}`).classList.toggle('active', t === tab);
+  });
+}
+
+function renderHistSesiones() {
+  const el = document.getElementById('hist-sesiones');
+  if (STATE.historial.length === 0) {
+    el.innerHTML = '<div class="card"><p style="color:var(--text-muted); text-align:center; padding:20px;">Aún no tienes sesiones registradas.<br>¡Completa tu primera práctica!</p></div>';
+    return;
+  }
+  const modeIcons = { simulacro:'⏱️', libre:'📖', repaso:'🔄' };
+  el.innerHTML = STATE.historial.slice(0, 20).map(h => `
+    <div class="history-item">
+      <div class="history-icon ${h.modalidad}"><span>${modeIcons[h.modalidad]||'📝'}</span></div>
+      <div class="history-info">
+        <strong>${h.cursos || 'Práctica'} · ${h.semanas || ''}</strong>
+        <p>${h.modalidad} · ${formatDate(h.fecha)} · ${h.duracion||''}</p>
+      </div>
+      <div class="history-score" style="color:${h.porcentaje>=70?'var(--success)':h.porcentaje>=50?'var(--warning)':'var(--danger)'}">${h.porcentaje}%</div>
+    </div>
+  `).join('');
+}
+
+function renderHistCursos() {
+  const el = document.getElementById('hist-cursos');
+  if (STATE.historial.length === 0) { el.innerHTML = ''; return; }
+
+  const byCurso = {};
+  STATE.historial.forEach(h => {
+    const cursos = (h.cursos||'').split(',');
+    cursos.forEach(c => {
+      c = c.trim();
+      if (!c) return;
+      if (!byCurso[c]) byCurso[c] = { sum: 0, count: 0 };
+      byCurso[c].sum += h.porcentaje;
+      byCurso[c].count++;
+    });
+  });
+
+  el.innerHTML = Object.entries(byCurso).map(([curso, v]) => {
+    const avg = Math.round(v.sum / v.count);
+    return `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <strong>${curso}</strong>
+          <span style="font-weight:700; color:${avg>=70?'var(--success)':avg>=50?'var(--warning)':'var(--danger)'};">${avg}%</span>
+        </div>
+        <div class="rank-bar"><div class="rank-fill" style="width:${avg}%; background:${avg>=70?'var(--success)':avg>=50?'var(--warning)':'var(--danger)'}"></div></div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:6px;">${v.count} sesión${v.count>1?'es':''}</p>
+      </div>`;
+  }).join('');
+}
+
+function renderHistRanking() {
+  const el = document.getElementById('hist-ranking');
+  el.innerHTML = '<div class="card"><p style="color:var(--text-muted); font-size:14px; padding:8px 0;">Ranking semanal — completa una práctica para aparecer aquí.</p></div>';
+}
+
+// ============================================================
+// ADMIN
+// ============================================================
+function renderAdmin() {
+  if (STATE.user.email !== CONFIG.ADMIN_EMAIL.toLowerCase()) return;
+
+  // Stats básicas
+  const stats = document.getElementById('admin-stats');
+  const totalPreg = STATE.preguntas.length;
+  const totalSes = STATE.historial.length;
+  stats.innerHTML = `
+    <div class="admin-stat"><div class="num">${totalPreg}</div><div class="lbl">Preguntas</div></div>
+    <div class="admin-stat"><div class="num">${totalSes}</div><div class="lbl">Sesiones totales</div></div>
+    <div class="admin-stat"><div class="num">${STATE.preguntas.filter(p=>p.universidad==='UPN').length}</div><div class="lbl">Preg. UPN</div></div>
+    <div class="admin-stat"><div class="num">${STATE.preguntas.filter(p=>p.universidad==='WIENER').length}</div><div class="lbl">Preg. Wiener</div></div>
+  `;
+  renderAdminGlobal();
+}
+
+function showAdminTab(tab) {
+  ['global','preguntas','alumnos'].forEach(t => {
+    document.getElementById(`admin-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`atab-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'preguntas') renderAdminPreguntas();
+  if (tab === 'alumnos') renderAdminAlumnos();
+}
+
+function renderAdminGlobal() {
+  const el = document.getElementById('admin-global');
+  // Preguntas más falladas (simplificado — necesita hoja RESPUESTAS_DETALLE)
+  el.innerHTML = `
+    <div class="card">
+      <div class="section-title">Distribución por curso</div>
+      ${Object.entries(STATE.preguntas.reduce((acc, p) => { acc[p.curso] = (acc[p.curso]||0)+1; return acc; }, {}))
+        .sort((a,b) => b[1]-a[1])
+        .slice(0, 8)
+        .map(([c, n]) => `
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <span style="font-size:13px; min-width:140px; color:var(--text);">${c}</span>
+            <div class="rank-bar" style="flex:1;"><div class="rank-fill" style="width:${(n/STATE.preguntas.length)*100}%"></div></div>
+            <span style="font-size:13px; font-weight:600; color:var(--text-muted);">${n}</span>
+          </div>`).join('')}
+    </div>`;
+}
+
+function renderAdminPreguntas() {
+  const el = document.getElementById('admin-preguntas');
+  const sample = STATE.preguntas.slice(0, 10);
+  el.innerHTML = `
+    <div class="card">
+      <div class="section-title">Primeras ${sample.length} preguntas cargadas</div>
+      ${sample.map(p => `
+        <div style="padding:10px 0; border-bottom:1px solid var(--border); font-size:13px;">
+          <strong>${p.curso} · ${p.semana}</strong>
+          <p style="color:var(--text-muted); margin-top:2px;">${p.pregunta.substring(0,80)}...</p>
+        </div>`).join('')}
+      <p style="font-size:12px; color:var(--text-muted); margin-top:12px;">Para editar preguntas, abre tu Google Sheet directamente.</p>
+    </div>`;
+}
+
+function renderAdminAlumnos() {
+  const el = document.getElementById('admin-alumnos');
+  el.innerHTML = `<div class="card"><p style="color:var(--text-muted); font-size:14px;">Los alumnos se gestionan directamente en tu Google Sheet.<br><a href="https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}" target="_blank" style="color:var(--primary);">Abrir hoja de alumnos →</a></p></div>`;
+}
+
+// ============================================================
+// UTILIDADES
+// ============================================================
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function formatDate(iso) {
+  try { return new Date(iso).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }); }
+  catch { return iso; }
+}
+
+function getWeekISO() {
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const week = Math.ceil((((now - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${week.toString().padStart(2,'0')}`;
+}
+
+function getErrorIds() {
+  // Lee del historial local - simplificado
+  return [];
+}
+
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ============================================================
+// ARRANCAR
+// ============================================================
+window.addEventListener('load', init);
+</script>
+
+</body>
+</html>
